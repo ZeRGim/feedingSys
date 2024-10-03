@@ -1,15 +1,20 @@
-#include <Wire.h>   // I2C 통신을 위한 라이브러리
-#include <RTClib.h> // RTC 모듈용 RTCLib 라이브러리
-#include "DHT.h"  
-RTC_DS3231 rtc; // DS3231 RTC 모듈 객체 생성
+#include <DS1302.h>
+#include <dht11.h>
+#include <Time.h>
+#define DHTPIN 2
+dht11 DHT11;
 // 수위 센서 핀이 연결된 아날로그 핀
 int waterSensorPin = A0;
 
-// 센서 데이터를 저장할 변수
+const int CLK = 5;
+const int DAT = 6;
+const int RST = 7;
+DS1302 myrtc(RST, DAT, CLK);
+
 int waterSensorValue = 0;
 
 int feedCycle = 86400;
-DateTime currentFeed;
+time_t currentFeed;
 const int lowWater=5;
 bool forbidFeed = false;
 
@@ -18,39 +23,63 @@ void feeding()
   Serial.println("1");
 }
 
-void setup() {
-  Serial.begin(9600);
-
-  if (!rtc.begin()) {
-    Serial.println("RTC 모듈을 찾을 수 없습니다!");
-    while (1);
-  }
-
-  if (rtc.lostPower()) {
-    Serial.println("RTC의 전원이 꺼졌습니다! 시간을 재설정합니다.");
-    // 현재 시간을 다시 설정: 연도, 월, 일, 시, 분, 초
-    rtc.adjust(DateTime(2024, 9, 26, 14, 0, 0)); 
-  }
-  currentFeed = rtc.now();
+void change_cycle(){
+  delay(100);
+  feedCycle = (int)Serial.readStringUntil('\n');
 }
 
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
 
+  myrtc.halt(false);
+  myrtc.writeProtect(false);
+  myrtc.setDOW(MONDAY);
+  myrtc.setTime(14, 30, 20);
+  myrtc.setDate(13, 4, 2020);
 
+}
 
 void loop() {
+  delay(2000);
+
+  Time t = rtc.time();
+
+  // Unix Time 계산
+  tmElements_t tm;
+  tm.Second = t.sec;
+  tm.Minute = t.min;
+  tm.Hour = t.hour;
+  tm.Day = t.date;
+  tm.Month = t.mon;
+  tm.Year = t.year - 1970;  // Time elements의 year는 1970 기준을 사용
+
+  time_t unixTime = makeTime(tm);
+
   if (Serial.available() > 0) {
     receivedData = Serial.readStringUntil('\n');  // '\n'이 올 때까지 문자열로 읽음
-    Serial.print("Received: ");
-    Serial.println(receivedData);  // 전송된 문자열 출력
+    if(receivedData=="changecycle"){
+      change_cycle();
+    }
+    else if(receivedData=="feed"){
+      feeding();
+    }
   }
+
+
+  float humidity = dht.readHumidity();    // 습도 값 읽기
+  float temperature = dht.readTemperature(); // 온도 값 읽기
   waterSensorValue = analogRead(waterSensorPin); // 수위 센서로부터 아날로그 값을 읽기
-  DateTime now = rtc.now();
-  if(now.unixtime() - currentFeed.unixtime() >= feedCycle && !forbidFeed){
+
+  time_t now = unixTime;
+  if(now - currentFeed >= feedCycle && !forbidFeed){
     feeding();
     currentFeed = now;
+    Serial.println("cur"+currentFeed);
   }
-  int a= 1;
-
+  Serial.println("tem"+temperature);
+  Serial.println("hum"+humidity);
+  Serial.println("wat"+waterSensorValue);
   if(waterSensorValue<lowWater)
   {
     forbidFeed = true;
@@ -60,8 +89,6 @@ void loop() {
     forbidFeed = false; 
     Serial.println("allowFeeding");
   }
-  Serial.print("수위 센서 값: ");
-  Serial.println(waterSensorValue);
 
   // 짧은 지연
   delay(1000);

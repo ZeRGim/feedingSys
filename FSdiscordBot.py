@@ -2,18 +2,21 @@ import discord
 from discord.ext import commands, tasks
 import serial
 import dotenv, os
-import asyncio
-import sys
 token = str(os.getenv("TOKEN"))
-intents = discord.Intents.default()
+intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # ser = serial.Serial('COM3')
 ser = serial.Serial()
+
+temper = 0
+humid = 0
+water = 0
+curfeed = 0
 class buttonView(discord.ui.View):
     def __init__(self):
         super().__init__()
-        self.self_feeding = discord.ui.Button(emoji="💧",label="수동 급수", style=discord.ButtonStyle.primary)
+        self.self_feeding = discord.ui.Button(emoji="💧",label="수동 급수", style=discord.ButtonStyle.primary, custom_id="selffeed")
         self.self_feeding.callback = self.self_feeding_callback
         self.add_item(self.self_feeding)
         
@@ -39,12 +42,12 @@ class MyDropdown(discord.ui.Select):
             discord.SelectOption(label='2 hour', description='Feeding in 2-hour cycles'),
             discord.SelectOption(label='1 day', description='Feeding in a day cycles')
         ]
-        super().__init__(placeholder='Choose an cycles', max_values=1, min_values=1, options=options)
+        super().__init__(placeholder='Choose an cycles', max_values=1, min_values=1, options=options,custom_id="cycle")
 
     async def callback(self, interaction: discord.Interaction):
-        # await ser.write(b"changecycle")
-        # selected = self.values[0].encode()
-        # await ser.write(selected)
+        await ser.write(b"changecycle")
+        selected = self.values[0].encode()
+        await ser.write(selected)
         await interaction.response.send_message(f'You selected: {self.values[0]}', ephemeral=True)
         
 
@@ -61,9 +64,9 @@ async def sendbtn(ctx):
     embed = discord.Embed(
         color=discord.Color.dark_teal()
     )
-    embed.add_field(name="온도", value="27.87°C", inline=False) #잔여 물
-    embed.add_field(name="온도", value="27.87°C", inline=False) #다음 주기까지 남은시간 / 현재 주기
-    embed.add_field(name="전에 준 시간!", value="27.87°C", inline=False) #다음 주기까지 남은시간 / 현재 주기
+    embed.add_field(name="온도", value=temper, inline=False) #잔여 물
+    embed.add_field(name="습도", value=humid, inline=False) #다음 주기까지 남은시간 / 현재 주기
+    embed.add_field(name="전에 준 시간!", value=curfeed, inline=False) #다음 주기까지 남은시간 / 현재 주기
     
     if channel:
         await channel.send(view=BV, embed=embed)  # 입력된 메시지를 해당 채널에 보냄
@@ -84,12 +87,26 @@ async def senddrop(ctx):
 
 @tasks.loop(seconds=2)
 async def event_check():
-    if ser.in_waiting > 0:  # 수신할 데이터가 있으면
+    global temper
+    global humid
+    global water
+    global curfeed
+    
+    while ser.in_waiting > 0:  # 수신할 데이터가 있으면
         data_bytes = ser.readline()  # 데이터를 한 줄 읽음 (줄 바꿈 기준)
         data_str = data_bytes.decode('utf-8').rstrip()  # 데이터를 'utf-8'로 디코딩하여 문자열로 변환하고 개행 문자 제거
         if data_str == "forbidFeeding":
             BV.disabling()
         elif data_str == "allowFeeding":
             BV.abling()
+        elif "tem" in data_str:
+            temper = data_str
+        elif "hum" in data_str:
+            humid = data_str
+        elif "wat" in data_str: 
+            water = data_str
+        elif "cur" in data_str:
+            curfeed = data_str
+            
 
 bot.run(token)
