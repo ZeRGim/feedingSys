@@ -14,6 +14,9 @@ temper = 0
 humid = 0
 water = 0
 curfeed = 0
+curhr = 0
+curmin =0
+cursec = 0
 class buttonView(discord.ui.View):
     def __init__(self, *items: Item, timeout: float | None = None, disable_on_timeout: bool = False):
         super().__init__(*items, timeout=timeout, disable_on_timeout=disable_on_timeout)
@@ -78,6 +81,7 @@ class DropView(discord.ui.View):
 async def on_ready():
     bot.add_view(DropView())
     bot.add_view(buttonView())
+    event_check.start()
     print(f"{bot.user} is ready and online")
 
 @bot.command()
@@ -96,7 +100,7 @@ async def sendbtn(ctx):
     )
     embed.add_field(name="온도", value=temper, inline=False) #잔여 물
     embed.add_field(name="습도", value=humid, inline=False) #다음 주기까지 남은시간 / 현재 주기
-    embed.add_field(name="전에 준 시간!", value=curfeed, inline=False) #다음 주기까지 남은시간 / 현재 주기
+    embed.add_field(name="전에 준 시간!", value=f"2024-10-04 {curhr}:{curmin}:{cursec}", inline=False) #다음 주기까지 남은시간 / 현재 주기
     
     if channel:
         await channel.send(view=BV, embed=embed)  # 입력된 메시지를 해당 채널에 보냄
@@ -116,15 +120,30 @@ async def senddrop(ctx):
         await ctx.send(f"채널 {channel_id}를 찾을 수 없습니다.")
 
 async def gangsin(chid:int, meid:int):
-    pass
+    channel = bot.get_channel(chid)
+    msg = await channel.fetch_message(meid)
+    embed = discord.Embed(
+        color=discord.Color.dark_teal()
+    )
+    embed.add_field(name="온도", value=temper, inline=False) #잔여 물
+    embed.add_field(name="습도", value=humid, inline=False) #다음 주기까지 남은시간 / 현재 주기
+    embed.add_field(name="전에 준 시간!", value=f"2024-10-04 {curhr}:{curmin}:{cursec}", inline=False) #다음 주기까지 남은시간 / 현재 주기
+    
+    await msg.edit(embed=embed)
+
+@bot.command()
+async def gang(ctx):
+    await gangsin(1288751209179512875, 1291665741984301057)
 
 @tasks.loop(seconds=2)
 async def event_check():
     global temper
-    global humid
+    global humid    
     global water
     global curfeed
-    
+    global curhr
+    global curmin
+    global cursec
     while ser.in_waiting > 0:  # 수신할 데이터가 있으면
         data_bytes = ser.readline()  # 데이터를 한 줄 읽음 (줄 바꿈 기준)
         data_str = data_bytes.decode('utf-8').rstrip()  # 데이터를 'utf-8'로 디코딩하여 문자열로 변환하고 개행 문자 제거
@@ -137,9 +156,15 @@ async def event_check():
         elif "hum" in data_str:
             humid = data_str
         elif "wat" in data_str: 
-            water = data_str
+            water = float(data_str[3:])
         elif "cur" in data_str:
-            curfeed = data_str
+            curfeed = int(data_str[3:])
+            curhr = curfeed//(60*60)
+            curfeed = curfeed%(60*60)
+            curmin = curfeed//(60)
+            curfeed = curfeed%60
+            cursec = curfeed
+            await gangsin(1288751209179512875, 1291665741984301057)
     
             
 
