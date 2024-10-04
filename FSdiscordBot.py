@@ -3,12 +3,13 @@ from discord.ext import commands, tasks
 from discord.ui.item import Item
 import serial
 import dotenv, os
+import asyncio
 token = str(os.getenv("TOKEN"))
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# ser = serial.Serial('COM3')
-ser = serial.Serial()
+ser = serial.Serial('COM3')
+# ser = serial.Serial()
 
 temper = 0
 humid = 0
@@ -26,7 +27,7 @@ class buttonView(discord.ui.View):
         
     async def self_feeding_callback(self, interaction: discord.Interaction):
         await interaction.response.send_message("버튼이 클릭되었습니다!", ephemeral=True)
-        await ser.write(b"feed")
+        ser.write(b"feed")
     def disabling(self):
         self.self_feeding.disabled = True
     def abling(self):
@@ -63,6 +64,8 @@ class DropView(discord.ui.View):
         custom_id="cycle",
         options = [
             discord.SelectOption(label='10', description='To test, short term'),
+            discord.SelectOption(label='15', description='To test, short term'),
+            discord.SelectOption(label='30', description='To test, short term'),
             discord.SelectOption(label='900', description='Feeding in 15-minute cycles'),
             discord.SelectOption(label='1800', description='Feeding in 30-minute cycles'),
             discord.SelectOption(label='3600', description='Feeding in a hour cycles', default=True),
@@ -71,9 +74,10 @@ class DropView(discord.ui.View):
         ]
     )
     async def select_callback(self,select: discord.ui.Select, interaction: discord.Interaction):
-        # await ser.write(b"changecycle")
-        # selected = self.values[0].encode()
-        # await ser.write(selected)
+        ser.write(b"changecycle")
+        await asyncio.sleep(0.1)
+        # selected = select.values[0].encode()
+        ser.write(int(select.values[0]))
         await interaction.response.send_message(f'You selected: {select.values[0]}', ephemeral=True)
         
 
