@@ -62,12 +62,12 @@ class DropView(discord.ui.View):
         min_values=1,
         custom_id="cycle",
         options = [
-            discord.SelectOption(label='10 sec(for test)', description='To test, short term'),
-            discord.SelectOption(label='15 min', description='Feeding in 15-minute cycles'),
-            discord.SelectOption(label='30 min', description='Feeding in 30-minute cycles'),
-            discord.SelectOption(label='1 hour', description='Feeding in a hour cycles', default=True),
-            discord.SelectOption(label='2 hour', description='Feeding in 2-hour cycles'),
-            discord.SelectOption(label='1 day', description='Feeding in a day cycles')
+            discord.SelectOption(label='10', description='To test, short term'),
+            discord.SelectOption(label='900', description='Feeding in 15-minute cycles'),
+            discord.SelectOption(label='1800', description='Feeding in 30-minute cycles'),
+            discord.SelectOption(label='3600', description='Feeding in a hour cycles', default=True),
+            discord.SelectOption(label='7200', description='Feeding in 2-hour cycles'),
+            discord.SelectOption(label='86400', description='Feeding in a day cycles')
         ]
     )
     async def select_callback(self,select: discord.ui.Select, interaction: discord.Interaction):
