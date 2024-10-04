@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands, tasks
+from discord.ui.item import Item
 import serial
 import dotenv, os
 token = str(os.getenv("TOKEN"))
@@ -14,8 +15,8 @@ humid = 0
 water = 0
 curfeed = 0
 class buttonView(discord.ui.View):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *items: Item, timeout: float | None = None, disable_on_timeout: bool = False):
+        super().__init__(*items, timeout=timeout, disable_on_timeout=disable_on_timeout)
         self.self_feeding = discord.ui.Button(emoji="💧",label="수동 급수", style=discord.ButtonStyle.primary, custom_id="selffeed")
         self.self_feeding.callback = self.self_feeding_callback
         self.add_item(self.self_feeding)
@@ -27,13 +28,36 @@ class buttonView(discord.ui.View):
         self.self_feeding.disabled = True
     def abling(self):
         self.self_feeding.disabled = False
-class DropView(discord.ui.View):
-    def __init__(self):
-        super().__init__()
-        self.add_item(MyDropdown())
+# class DropView(discord.ui.View):
+#     def __init__(self):
+#         super().__init__()
+#         self.add_item(MyDropdown())
 
-class MyDropdown(discord.ui.Select):
-    def __init__(self):
+# class MyDropdown(discord.ui.Select):
+#     def __init__(self):
+#         options = [
+#             discord.SelectOption(label='10', description='10sec'),
+#             discord.SelectOption(label='900', description='Feeding in 15-minute cycles'),
+#             discord.SelectOption(label='1800', description='Feeding in 30-minute cycles'),
+#             discord.SelectOption(label='3600', description='Feeding in a hour cycles', default=True),
+#             discord.SelectOption(label='7200', description='Feeding in 2-hour cycles'),
+#             discord.SelectOption(label='86400', description='Feeding in a day cycles')
+#         ]
+#         super().__init__(placeholder='Choose an cycles', max_values=1, min_values=1, options=options,custom_id="cycle")
+
+#     async def callback(self, interaction: discord.Interaction):
+#         await ser.write(b"changecycle")
+#         selected = self.values[0].encode()
+#         await ser.write(selected)
+#         await interaction.response.send_message(f'You selected: {self.values[0]}', ephemeral=True)
+class DropView(discord.ui.View):
+    def __init__(self, *items: Item, timeout: float | None = None, disable_on_timeout: bool = False):
+        super().__init__(*items, timeout=timeout, disable_on_timeout=disable_on_timeout)
+    @discord.ui.select(
+        placeholder='Choose an cycles',
+        max_values=1, 
+        min_values=1,
+        custom_id="cycle",
         options = [
             discord.SelectOption(label='10 sec(for test)', description='To test, short term'),
             discord.SelectOption(label='15 min', description='Feeding in 15-minute cycles'),
@@ -42,19 +66,25 @@ class MyDropdown(discord.ui.Select):
             discord.SelectOption(label='2 hour', description='Feeding in 2-hour cycles'),
             discord.SelectOption(label='1 day', description='Feeding in a day cycles')
         ]
-        super().__init__(placeholder='Choose an cycles', max_values=1, min_values=1, options=options,custom_id="cycle")
-
-    async def callback(self, interaction: discord.Interaction):
-        await ser.write(b"changecycle")
-        selected = self.values[0].encode()
-        await ser.write(selected)
-        await interaction.response.send_message(f'You selected: {self.values[0]}', ephemeral=True)
+    )
+    async def select_callback(self,select: discord.ui.Select, interaction: discord.Interaction):
+        # await ser.write(b"changecycle")
+        # selected = self.values[0].encode()
+        # await ser.write(selected)
+        await interaction.response.send_message(f'You selected: {select.values[0]}', ephemeral=True)
         
 
 @bot.event
 async def on_ready():
+    bot.add_view(DropView())
+    bot.add_view(buttonView())
     print(f"{bot.user} is ready and online")
-    
+
+@bot.command()
+async def setup(ctx):
+    sendbtn(ctx)
+    senddrop(ctx)
+
 @bot.command()
 async def sendbtn(ctx):
     global BV
@@ -85,6 +115,9 @@ async def senddrop(ctx):
     else:
         await ctx.send(f"채널 {channel_id}를 찾을 수 없습니다.")
 
+async def gangsin(chid:int, meid:int):
+    pass
+
 @tasks.loop(seconds=2)
 async def event_check():
     global temper
@@ -107,6 +140,7 @@ async def event_check():
             water = data_str
         elif "cur" in data_str:
             curfeed = data_str
+    
             
 
 bot.run(token)
