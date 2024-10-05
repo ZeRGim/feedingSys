@@ -8,8 +8,8 @@ token = str(os.getenv("TOKEN"))
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-ser = serial.Serial('COM3')
-# ser = serial.Serial()
+# ser = serial.Serial('COM3')
+ser = serial.Serial()
 
 temper = 0
 humid = 0
@@ -26,7 +26,7 @@ class buttonView(discord.ui.View):
         self.add_item(self.self_feeding)
         
     async def self_feeding_callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("버튼이 클릭되었습니다!", ephemeral=True)
+        await interaction.response.send_message("급수!", ephemeral=True)
         ser.write(b"feed")
     def disabling(self):
         self.self_feeding.disabled = True
@@ -78,8 +78,15 @@ class DropView(discord.ui.View):
         await asyncio.sleep(0.1)
         # selected = select.values[0].encode()
         ser.write(int(select.values[0]))
-        await interaction.response.send_message(f'You selected: {select.values[0]}', ephemeral=True)
+        await interaction.response.send_message(f'주기: {select.values[0]}초', ephemeral=True)
         
+
+@bot.command()
+async def 비활(ctx):
+    await disa(int(os.getenv("CHANNEL_ID")),int(os.getenv("MESSAGE_ID")))
+@bot.command()
+async def 재활(ctx):
+    await ab(int(os.getenv("CHANNEL_ID")),int(os.getenv("MESSAGE_ID")))
 
 @bot.event
 async def on_ready():
@@ -89,14 +96,8 @@ async def on_ready():
     print(f"{bot.user} is ready and online")
 
 @bot.command()
-async def setup(ctx):
-    sendbtn(ctx)
-    senddrop(ctx)
-
-@bot.command()
 async def sendbtn(ctx):
-    global BV
-    channel_id = 1288751209179512875
+    channel_id = int(os.getenv("CHANNEL_ID"))
     channel = bot.get_channel(channel_id)
     BV = buttonView()  #버튼포함 view 인스턴스 생성
     embed = discord.Embed(
@@ -104,6 +105,7 @@ async def sendbtn(ctx):
     )
     embed.add_field(name="온도", value=temper, inline=False) #잔여 물
     embed.add_field(name="습도", value=humid, inline=False) #다음 주기까지 남은시간 / 현재 주기
+    embed.add_field(name="남은 물 양", value=water, inline=False) #다음 주기까지 남은시간 / 현재 주기
     embed.add_field(name="전에 준 시간!", value=f"2024-10-04 {curhr}:{curmin}:{cursec}", inline=False) #다음 주기까지 남은시간 / 현재 주기
     
     if channel:
@@ -114,7 +116,7 @@ async def sendbtn(ctx):
 @bot.command()
 async def senddrop(ctx):
     global DV
-    channel_id = 1288751209179512875
+    channel_id = int(os.getenv("CHANNEL_ID"))
     channel = bot.get_channel(channel_id)
     DV = DropView()  #버튼포함 view 인스턴스 생성
     if channel:
@@ -131,13 +133,26 @@ async def gangsin(chid:int, meid:int):
     )
     embed.add_field(name="온도", value=temper, inline=False) #잔여 물
     embed.add_field(name="습도", value=humid, inline=False) #다음 주기까지 남은시간 / 현재 주기
+    embed.add_field(name="남은 물 양", value=water, inline=False) #다음 주기까지 남은시간 / 현재 주기
     embed.add_field(name="전에 준 시간!", value=f"2024-10-04 {curhr}:{curmin}:{cursec}", inline=False) #다음 주기까지 남은시간 / 현재 주기
     
     await msg.edit(embed=embed)
 
+async def disa(chid:int, meid:int):
+    channel = bot.get_channel(chid)
+    msg = await channel.fetch_message(meid)
+    BV = buttonView()
+    BV.disabling()
+    await msg.edit(view=BV)
+async def ab(chid:int, meid:int):
+    channel = bot.get_channel(chid)
+    msg = await channel.fetch_message(meid)
+    BV = buttonView()
+    BV.abling()
+    await msg.edit(view=BV)
 @bot.command()
 async def gang(ctx):
-    await gangsin(1288751209179512875, 1291665741984301057)
+    await gangsin(int(os.getenv("CHANNEL_ID")), int(os.getenv("MESSAGE_ID")))
 
 @tasks.loop(seconds=2)
 async def event_check():
@@ -152,15 +167,15 @@ async def event_check():
         data_bytes = ser.readline()  # 데이터를 한 줄 읽음 (줄 바꿈 기준)
         data_str = data_bytes.decode('utf-8').rstrip()  # 데이터를 'utf-8'로 디코딩하여 문자열로 변환하고 개행 문자 제거
         if data_str == "forbidFeeding":
-            BV.disabling()
+            await disa(int(os.getenv("CHANNEL_ID")),int(os.getenv("MESSAGE_ID")))
         elif data_str == "allowFeeding":
-            BV.abling()
+            await ab(int(os.getenv("CHANNEL_ID")),int(os.getenv("MESSAGE_ID")))
         elif "tem" in data_str:
-            temper = data_str
+            temper = float(data_str[3:])
         elif "hum" in data_str:
-            humid = data_str
+            humid = float(data_str[3:])
         elif "wat" in data_str: 
-            water = float(data_str[3:])
+            water = int(data_str[3:])
         elif "cur" in data_str:
             curfeed = int(data_str[3:])
             curhr = curfeed//(60*60)
@@ -168,8 +183,6 @@ async def event_check():
             curmin = curfeed//(60)
             curfeed = curfeed%60
             cursec = curfeed
-            await gangsin(1288751209179512875, 1291665741984301057)
-    
-            
+            await gangsin(int(os.getenv("CHANNEL_ID")), int(os.getenv("MESSAGE_ID")))
 
 bot.run(token)

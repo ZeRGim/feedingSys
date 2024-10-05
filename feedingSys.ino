@@ -1,11 +1,9 @@
 #include <Arduino_BuiltIn.h>
 #include <Servo.h>
 #include <DS1302.h>
-// #include <dht11.h>
-// #define DHTPIN 2
-// dht11 DHT11;
-// 수위 센서 핀이 연결된 아날로그 핀
-int waterSensorPin = A0;
+#include <DHT.h>
+
+DHT dht(2, DHT11);
 
 const int CLK = 6;
 const int DAT = 5;
@@ -16,7 +14,8 @@ Servo servo;
 int pos=0;
 const int servoPin=7; //서보모터 연결부
 
-int waterSensorValue = 0;
+int waterSensorPin = A0;
+int waterSensorValue = 0; // 수위센서
 
 int feedCycle = 30;
 long currentFeed = 0;
@@ -53,6 +52,7 @@ void setup() {
   rtc.setTime(17, 43, 30);
   // rtc.setDate(13, 4, 2020);
   servo.write(0);
+  dht.begin();
 }
 
 void loop() {
@@ -89,27 +89,30 @@ void loop() {
   // Serial.println(t.hour);
   // Serial.println(unixtime);
   // Serial.println(globalunix);
-  // float humidity = dht.readHumidity();    // 습도 값 읽기
-  // float temperature = dht.readTemperature(); // 온도 값 읽기
-  // waterSensorValue = analogRead(waterSensorPin); // 수위 센서로부터 아날로그 값을 읽기
+  float humidity = dht.readHumidity();    // 습도 값 읽기
+  float temperature = dht.readTemperature(); // 온도 값 읽기
+  waterSensorValue = analogRead(waterSensorPin); // 수위 센서로부터 아날로그 값을 읽기
 
   if(unixtime - currentFeed >= feedCycle && !forbidFeed){
     feeding();
     currentFeed = globalunix;
   }
-  // Serial.println("tem"+temperature);
-  // Serial.println("hum"+humidity);
-  // Serial.println("wat"+waterSensorValue);
-  // if(waterSensorValue<lowWater)
-  // {
-  //   forbidFeed = true;
-  //   Serial.println("forbidFeeding");
-  // }
-  // else{
-  //   forbidFeed = false; 
-  //   Serial.println("allowFeeding");
-  // }
+  Serial.print("tem");
+  Serial.println(temperature);
+  Serial.print("hum");
+  Serial.println(humidity);
+  Serial.print("wat");
+  Serial.println(waterSensorValue);
+  if(waterSensorValue<lowWater)
+  {
+    forbidFeed = true;
+    Serial.println("forbidFeeding");
+  }
+  else{
+    forbidFeed = false; 
+    Serial.println("allowFeeding");
+  }
 
   // 짧은 지연
-  delay(1000);
+  delay(2000);
 }
